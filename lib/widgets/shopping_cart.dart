@@ -28,9 +28,14 @@ class _ShoppingCartState extends State<ShoppingCart> {
 
   void addItem(String id, String name, double price, {double discount = 0.0}) {
     setState(() {
-      _items.add(
-        CartItem(id: id, name: name, price: price, discount: discount),
-      );
+      final existingIndex = _items.indexWhere((item) => item.id == id);
+      if (existingIndex != -1) {
+        _items[existingIndex].quantity++;
+      } else {
+        _items.add(
+          CartItem(id: id, name: name, price: price, discount: discount),
+        );
+      }
     });
   }
 
@@ -70,13 +75,13 @@ class _ShoppingCartState extends State<ShoppingCart> {
   double get totalDiscount {
     double discount = 0;
     for (var item in _items) {
-      discount += item.discount * item.quantity;
+      discount += (item.price * item.discount * item.quantity);
     }
     return discount;
   }
 
   double get totalAmount {
-    return subtotal + totalDiscount;
+    return subtotal - totalDiscount;
   }
 
   int get totalItems {
