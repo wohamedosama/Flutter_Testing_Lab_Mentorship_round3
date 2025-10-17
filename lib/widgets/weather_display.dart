@@ -17,11 +17,11 @@ class _WeatherDisplayState extends State<WeatherDisplay> {
   final List<String> _cities = ['New York', 'London', 'Tokyo', 'Invalid City'];
 
   double celsiusToFahrenheit(double celsius) {
-    return celsius * 9 / 5;
+    return (celsius * 9 / 5) + 32;
   }
 
   double fahrenheitToCelsius(double fahrenheit) {
-    return fahrenheit - 32 * 5 / 9;
+    return (fahrenheit - 32) * 5 / 9;
   }
 
   // Simulate API call that sometimes returns null or malformed data
@@ -32,9 +32,8 @@ class _WeatherDisplayState extends State<WeatherDisplay> {
       return null;
     }
 
-    
     if (DateTime.now().millisecond % 4 == 0) {
-      return {'city': city, 'temperature': 22.5}; 
+      return {'city': city, 'temperature': 22.5};
     }
 
     return {
@@ -50,25 +49,48 @@ class _WeatherDisplayState extends State<WeatherDisplay> {
   }
 
   Future<void> _loadWeather() async {
-    if (mounted) {
+    if (!mounted) return;
+
+    setState(() {
+      _isLoading = true;
+      _error = null;
+    });
+
+    try {
+      final data = await _fetchWeatherData(_selectedCity);
+
+      if (!mounted) return;
+
       setState(() {
-        _isLoading = true;
-        _error = null;
+        if (data == null) {
+          _error = 'Failed to load weather data for $_selectedCity';
+          _weatherData = null;
+        } else {
+          _weatherData = WeatherData.fromJson(data);
+          _error = null;
+        }
+        _isLoading = false;
+      });
+    } catch (e) {
+      if (!mounted) return;
+
+      setState(() {
+        _error = 'Error loading weather: $e';
+        _weatherData = null;
+        _isLoading = false;
       });
     }
-
-    
-    final data = await _fetchWeatherData(_selectedCity);
-    setState(() {
-      _weatherData = WeatherData.fromJson(data); 
-      _isLoading = false;
-    });
   }
 
   @override
   void initState() {
     super.initState();
     _loadWeather();
+  }
+
+  @override
+  void dispose() {
+    super.dispose();
   }
 
   @override
@@ -127,9 +149,44 @@ class _WeatherDisplayState extends State<WeatherDisplay> {
           ),
           const SizedBox(height: 16),
 
-          if (_isLoading && _error == null)
+          if (_isLoading)
             const Center(child: CircularProgressIndicator())
-          
+          else if (_error != null)
+            Card(
+              elevation: 4,
+              child: Padding(
+                padding: const EdgeInsets.all(16),
+                child: Column(
+                  children: [
+                    const Icon(
+                      Icons.error_outline,
+                      size: 48,
+                      color: Colors.red,
+                    ),
+                    const SizedBox(height: 16),
+                    Text(
+                      'Error Loading Weather',
+                      style: const TextStyle(
+                        fontSize: 24,
+                        fontWeight: FontWeight.bold,
+                        color: Colors.red,
+                      ),
+                    ),
+                    const SizedBox(height: 8),
+                    Text(
+                      _error!,
+                      textAlign: TextAlign.center,
+                      style: const TextStyle(fontSize: 16, color: Colors.grey),
+                    ),
+                    const SizedBox(height: 16),
+                    ElevatedButton(
+                      onPressed: _loadWeather,
+                      child: const Text('Retry'),
+                    ),
+                  ],
+                ),
+              ),
+            )
           else if (_weatherData != null)
             Card(
               elevation: 4,
@@ -199,8 +256,7 @@ class _WeatherDisplayState extends State<WeatherDisplay> {
                   ],
                 ),
               ),
-            )
-          
+            ),
         ],
       ),
     );
@@ -238,15 +294,14 @@ class WeatherData {
     required this.icon,
   });
 
-  
   factory WeatherData.fromJson(Map<String, dynamic>? json) {
     return WeatherData(
-      city: json!['city'],
-      temperatureCelsius: json['temperature'].toDouble(),
-      description: json['description'],
-      humidity: json['humidity'], 
-      windSpeed: json['windSpeed'].toDouble(), 
-      icon: json['icon'], 
+      city: json?['city'] ?? '',
+      temperatureCelsius: json?['temperature']?.toDouble() ?? 0.0,
+      description: json?['description'] ?? '',
+      humidity: json?['humidity'] ?? 0,
+      windSpeed: json?['windSpeed']?.toDouble() ?? 0.0,
+      icon: json?['icon'] ?? '',
     );
   }
 }
